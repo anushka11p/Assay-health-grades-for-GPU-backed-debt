@@ -1,0 +1,70 @@
+{
+ "schema_version": 1,
+ "period": {
+  "first": "2026-11-08T14:06:35Z",
+  "last": "2026-11-08T14:06:35Z"
+ },
+ "summary": {
+  "reports": 1,
+  "gpus": 1,
+  "providers": {
+   "colab": 1
+  },
+  "models": {
+   "Tesla T4": 1
+  },
+  "grades": {
+   "A": 1,
+   "B": 0,
+   "C": 0,
+   "D": 0,
+   "F": 0
+  },
+  "flagged": 0,
+  "compared_with_peers": 0,
+  "below_peers": 0,
+  "below_peers_pct": null,
+  "full_coverage": 0
+ },
+ "log": null,
+ "gpus": [
+  {
+   "key": "1564520009069-GPU-01b6d668-8759-2ed8-60c5-32dec7700a11",
+   "name": "Tesla T4",
+   "architecture": "Turing",
+   "serial": "1564520009069",
+   "uuid": "GPU-01b6d668-8759-2ed8-60c5-32dec7700a11",
+   "memory_total_mib": 15360,
+   "provider": "colab",
+   "driver_version": "580.82.07",
+   "checks": 1,
+   "latest": {
+    "file": "report-colab-20261108T140629Z.json",
+    "report_id": "5a39b0bece510231f810e244ba394d9a",
+    "created_at": "2026-11-08T14:06:35Z",
+    "digest": "sha256:c5c88716577507071bf6f401a54dd1d16c349806aa6673d55b1cd6c8b54209ab",
+    "key_id": "6d1a4208fab0fc24",
+    "log_index": null
+   },
+   "history": [
+    "report-colab-20261108T140629Z.json"
+   ],
+   "grade": {
+    "grade": "A",
+    "reason": "no problems found in any check that ran",
+    "coverage": "telemetry-only",
+    "findings": [],
+    "not_checked": [
+     "PCIe link speed under load",
+     "stress tests (telemetry-only check)",
+     "comparison with peers (needs 3+ Tesla T4 GPUs with stress-test results)"
+    ]
+   },
+   "peer_comparison": {},
+   "compared_with_peers": false,
+   "below_peers": false,
+   "gpu_index": 0
+  }
+ ],
+ "warnings": []
+}

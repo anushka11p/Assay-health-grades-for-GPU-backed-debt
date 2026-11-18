@@ -1,7 +1,12 @@
 package sign
 
 import (
+	"bytes"
 	"crypto/ed25519"
+	"crypto/sha256"
+	"encoding/base64"
+	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
@@ -125,5 +130,53 @@ func TestSaveKeyPairWontOverwrite(t *testing.T) {
 	}
 	if err := SaveKeyPair(dir, testKey(2), true); err != nil {
 		t.Fatalf("force should overwrite: %v", err)
+	}
+}
+
+// A real report from a Colab Tesla T4, signed on 8 Nov 2026 by the Week 1 agent,
+// before probes, host_probes and per-reading PCIe fields existed. It must keep
+// verifying no matter how the report format grows.
+func TestRealWeek1ReportStillVerifies(t *testing.T) {
+	data, err := os.ReadFile("testdata/colab-t4-2026-11-08.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	res, sig, err := VerifyJSON(data, nil)
+	if err != nil {
+		t.Fatalf("real Week 1 report no longer verifies: %v", err)
+	}
+	if res.KeyID != "6d1a4208fab0fc24" || sig.Digest != res.Digest {
+		t.Fatalf("result %+v", res)
+	}
+	// One changed digit must still be caught.
+	edited := bytes.Replace(data, []byte(`"temp_c": 52`), []byte(`"temp_c": 51`), 1)
+	if _, _, err := VerifyJSON(edited, nil); !errors.Is(err, ErrTampered) {
+		t.Fatalf("edited real report: got %v, want ErrTampered", err)
+	}
+}
+
+func TestUnknownFieldsAreCoveredBySignature(t *testing.T) {
+	// A field added by a future version is signed too: removing it must fail.
+	r := sampleReport()
+	_ = Sign(&r, testKey(1))
+	data, _ := json.Marshal(r)
+	var doc map[string]any
+	_ = json.Unmarshal(data, &doc)
+	doc["future_field"] = "x"
+	delete(doc, "signature")
+	msg, _ := report.Canonical(doc)
+	sum := sha256.Sum256(msg)
+	doc["signature"] = map[string]any{"algorithm": "ed25519", "key_id": KeyID(testKey(1).Public().(ed25519.PublicKey)),
+		"public_key": base64.StdEncoding.EncodeToString(testKey(1).Public().(ed25519.PublicKey)),
+		"digest":     "sha256:" + hex.EncodeToString(sum[:]),
+		"value":      base64.StdEncoding.EncodeToString(ed25519.Sign(testKey(1), msg))}
+	withField, _ := json.Marshal(doc)
+	if _, _, err := VerifyJSON(withField, nil); err != nil {
+		t.Fatalf("report with a newer field should verify: %v", err)
+	}
+	delete(doc, "future_field")
+	without, _ := json.Marshal(doc)
+	if _, _, err := VerifyJSON(without, nil); !errors.Is(err, ErrTampered) {
+		t.Fatal("dropping a signed field must be caught")
 	}
 }

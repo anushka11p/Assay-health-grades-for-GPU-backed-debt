@@ -19,6 +19,18 @@ jobs:
       - run: go test -race ./...
       - run: go build -o assay ./cmd/assay && ./assay version
 
+  grading:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: grading
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m unittest -v
+
   # Compiles the CUDA probes in NVIDIA's official CUDA image. No GPU needed to
   # compile, so this catches CUDA build errors on every push. Built for T4
   # (sm_75); the notebooks build for whatever GPU they get.

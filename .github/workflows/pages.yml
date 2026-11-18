@@ -1,0 +1,45 @@
+# Builds the census site from census/raw and publishes it to GitHub Pages.
+# Runs on every push to main. build.sh verifies every report's signature first,
+# so an unsigned or edited report fails the build instead of being published.
+#
+# One-time setup on GitHub: Settings -> Pages -> Source: "GitHub Actions".
+name: pages
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: agent/go.mod
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: scripts/build.sh
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

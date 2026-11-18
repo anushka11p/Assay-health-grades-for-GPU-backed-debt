@@ -14,12 +14,14 @@
 package sign
 
 import (
+	"bytes"
 	"crypto/ed25519"
 	"crypto/rand"
 	"crypto/sha256"
 	"crypto/x509"
 	"encoding/base64"
 	"encoding/hex"
+	"encoding/json"
 	"encoding/pem"
 	"errors"
 	"fmt"
@@ -159,40 +161,70 @@ type Result struct {
 
 // Verify checks r's signature. If trusted is non-nil, the report must also have
 // been signed by exactly that key. Any mismatch returns an error.
+//
+// It verifies r as JSON, so a report built in memory and one read from a file are
+// checked the same way. To check a file, prefer VerifyJSON on its exact bytes.
 func Verify(r report.Report, trusted ed25519.PublicKey) (Result, error) {
-	s := r.Signature
-	if s == nil {
-		return Result{}, errors.New("report is not signed")
+	data, err := json.Marshal(r)
+	if err != nil {
+		return Result{}, err
+	}
+	res, _, err := VerifyJSON(data, trusted)
+	return res, err
+}
+
+// VerifyJSON checks a report exactly as written: every field present in the
+// JSON is covered, whether or not this version of Assay knows about it.
+//
+// This keeps old reports verifiable forever. Re-encoding a report through
+// today's Report struct would add fields that didn't exist when it was signed
+// (as null), change its bytes and break the signature.
+func VerifyJSON(data []byte, trusted ed25519.PublicKey) (Result, *report.Signature, error) {
+	dec := json.NewDecoder(bytes.NewReader(data))
+	dec.UseNumber() // keep every number exactly as written
+	var doc map[string]any
+	if err := dec.Decode(&doc); err != nil {
+		return Result{}, nil, fmt.Errorf("not a valid report: %w", err)
+	}
+	rawSig, ok := doc["signature"]
+	if !ok || rawSig == nil {
+		return Result{}, nil, errors.New("report is not signed")
+	}
+	sigJSON, _ := json.Marshal(rawSig)
+	var s report.Signature
+	if err := json.Unmarshal(sigJSON, &s); err != nil {
+		return Result{}, nil, errors.New("signature block is malformed")
 	}
 	if s.Algorithm != "ed25519" {
-		return Result{}, fmt.Errorf("unsupported signature algorithm %q", s.Algorithm)
+		return Result{}, nil, fmt.Errorf("unsupported signature algorithm %q", s.Algorithm)
 	}
 	pubBytes, err := base64.StdEncoding.DecodeString(s.PublicKey)
 	if err != nil || len(pubBytes) != ed25519.PublicKeySize {
-		return Result{}, errors.New("signature has a malformed public key")
+		return Result{}, nil, errors.New("signature has a malformed public key")
 	}
 	pub := ed25519.PublicKey(pubBytes)
 	sig, err := base64.StdEncoding.DecodeString(s.Value)
 	if err != nil {
-		return Result{}, errors.New("signature value is not valid base64")
+		return Result{}, nil, errors.New("signature value is not valid base64")
 	}
 
-	msg, err := signedBytes(r)
+	delete(doc, "signature")
+	msg, err := report.Canonical(doc)
 	if err != nil {
-		return Result{}, err
+		return Result{}, nil, err
 	}
 	if !ed25519.Verify(pub, msg, sig) {
-		return Result{}, ErrTampered
+		return Result{}, nil, ErrTampered
 	}
 	sum := sha256.Sum256(msg)
 	if s.Digest != "sha256:"+hex.EncodeToString(sum[:]) {
-		return Result{}, ErrTampered
+		return Result{}, nil, ErrTampered
 	}
 	if s.KeyID != KeyID(pub) {
-		return Result{}, errors.New("key_id does not match the public key")
+		return Result{}, nil, errors.New("key_id does not match the public key")
 	}
 	if trusted != nil && !pub.Equal(trusted) {
-		return Result{}, fmt.Errorf("signed by key %s, but the trusted key is %s", KeyID(pub), KeyID(trusted))
+		return Result{}, nil, fmt.Errorf("signed by key %s, but the trusted key is %s", KeyID(pub), KeyID(trusted))
 	}
-	return Result{KeyID: s.KeyID, Digest: s.Digest, Pinned: trusted != nil}, nil
+	return Result{KeyID: s.KeyID, Digest: s.Digest, Pinned: trusted != nil}, &s, nil
 }
