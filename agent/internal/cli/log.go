@@ -63,14 +63,11 @@ func readSignedReport(path string) (report.Report, error) {
 	if err != nil {
 		return report.Report{}, err
 	}
-	r, err := report.Parse(data)
-	if err != nil {
-		return report.Report{}, err
-	}
-	if _, err := sign.Verify(r, nil); err != nil {
+	// Verify the exact bytes on disk, then parse for the fields the log records.
+	if _, _, err := sign.VerifyJSON(data, nil); err != nil {
 		return report.Report{}, fmt.Errorf("%s: %w", path, err)
 	}
-	return r, nil
+	return report.Parse(data)
 }
 
 // logPubKey reads the log's public key from the log directory, if present.

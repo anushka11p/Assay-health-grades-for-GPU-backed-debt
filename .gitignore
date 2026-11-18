@@ -14,3 +14,7 @@
 
 # Reports from local test runs (real census reports go in census/raw/)
 /agent/report*.json
+
+# Generated census site (built by scripts/build.sh and the Pages workflow)
+/site/
+/.assay-bin

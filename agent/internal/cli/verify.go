@@ -51,7 +51,7 @@ func runVerify(args []string, stdout, stderr io.Writer) int {
 		}
 	}
 
-	res, err := sign.Verify(r, trusted)
+	res, _, err := sign.VerifyJSON(data, trusted) // the exact bytes on disk
 	if err != nil {
 		fmt.Fprintf(stdout, "FAIL  %s: %v\n", path, err)
 		return 1

@@ -40,8 +40,13 @@ Read-only: Assay never changes any GPU setting. It only allocates memory and run
 ## 1. Which GPU(s) did we get?
 Each new session may give you a different physical GPU. The serial number tells them apart.
 """),
-        code("""
-!nvidia-smi --query-gpu=index,name,serial,uuid,compute_cap,driver_version,temperature.gpu --format=csv
+        code(f"""
+import shutil, subprocess
+# Stop right here if this session has no GPU (e.g. a CPU-only runtime was assigned).
+if shutil.which("nvidia-smi") is None:
+    raise SystemExit("No GPU in this session. {p['no_gpu']}")
+print(subprocess.run(["nvidia-smi", "--query-gpu=index,name,serial,uuid,compute_cap,driver_version,temperature.gpu",
+                      "--format=csv"], capture_output=True, text=True, check=True).stdout)
 """),
         md("""
 ## 2. Settings
@@ -164,6 +169,7 @@ PROVIDERS = [
     dict(
         file="colab_check.ipynb", name="colab", title="Google Colab", work="/content",
         setup="Runtime → Change runtime type → **T4 GPU** → Save. Then Runtime → Run all.",
+        no_gpu="Runtime → Change runtime type → T4 GPU → Save, then Run all again. If T4 is unavailable, Colab has no free GPUs right now: try later.",
         download_text="The zip downloads to your computer automatically.",
         download_code="from google.colab import files\nfiles.download(ZIP)",
         metadata={"accelerator": "GPU", "colab": {"provenance": [], "gpuType": "T4"}},
@@ -173,6 +179,7 @@ PROVIDERS = [
         setup=("in the notebook's right-hand panel, Session options → Accelerator → **GPU T4 x2** "
                "(two GPUs, so the all-reduce test runs too) or **GPU P100**, and Internet → **On** "
                "(needs a phone-verified Kaggle account). Then Run all."),
+        no_gpu="Session options → Accelerator → GPU T4 x2 (or P100), then Run all again.",
         download_text="The zip is saved in `/kaggle/working`: open the **Output** panel on the right and download it.",
         download_code='print("download it from the Output panel →")',
         metadata={},
